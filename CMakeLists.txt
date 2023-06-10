@@ -207,6 +207,8 @@ list(APPEND NGP_INCLUDE_DIRECTORIES
 	"dependencies/nanovdb"
 	"dependencies/NaturalSort"
 	"dependencies/tinylogger"
+	"dependencies/spdlog/include"
+	"src/"
 )
 
 find_package(OpenMP)
@@ -353,7 +355,14 @@ if (MSVC)
 endif()
 
 if (NGP_BUILD_EXECUTABLE)
-	add_executable(nerfshot src/main.cu)
+	add_executable(nerfshot src/main.cu
+		src/core/log.cpp
+		src/platform/input.cpp
+		src/platform/window.cpp
+		src/application.cpp
+		src/platform/glfw_window.cpp
+		src/main.cpp
+	)
 	target_link_libraries(nerfshot PRIVATE ngp)
 
 	# Link the executable to the project directory and copy over DLLs such that nerfshot can be invoked without going into the build folder.
