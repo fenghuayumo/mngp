@@ -1,7 +1,12 @@
 #include "application.h"
 #include "core/log.h"
 #include "platform/input.h"
-
+#include "engine/engine.h"
+#include "utility/profiler_cpu.h"
+#include "gui/gui.h"
+#include "graphics/gpu_context.h"
+#include "graphics/gpu_device.h"
+#include <iostream>
 namespace NerfShot
 {
 	Application* Application::s_Instance = nullptr;
@@ -18,6 +23,10 @@ namespace NerfShot
 		m_Window->Initialize();
 		m_Window->SetEventCallback(NRS_BIND_EVENT_FN(Application::OnEvent));
 
+
+		GpuDevice::Get().initialize();
+		m_edit_gui = std::make_unique<EditGui>();
+		m_edit_gui->init(m_Window.get());
 	}
 
 	Application::~Application()
@@ -46,19 +55,18 @@ namespace NerfShot
 			//auto timestep = time - m_LastFrameTime;
 
 			//m_LastFrameTime = time;
-
-			m_Window->OnUpdate();
-
+			Timer timer;
 			if (!m_Minimized)
 			{
 				Update(0);
 
 				Render();
 			}
+			//std::cout << "FPS: " << 1000.0f / timer.Elapsed() << std::endl;
 
 			if (Input::GetInput()->GetKeyPressed(Key::Escape))
 				m_Running = false;
-
+			m_Window->OnUpdate();
 		}
 	}
 
@@ -73,9 +81,26 @@ namespace NerfShot
 
 	void Application::Render()
 	{
+		ProfilerCPU::BeginFrame();
 		static bool showGui = true;
 		if (Input::GetInput()->GetKeyPressed(Key::G))
 			showGui = !showGui;
+
+		GpuDevice::Get().get_main_context()->begin_frame(m_Window.get());
+		if (showGui)
+		{
+			m_edit_gui->begin();
+
+			OnImGuiRender();
+
+			m_edit_gui->end();
+		}
+
+		GpuDevice::Get().get_main_context()->end_frame(m_Window.get());
+		Engine::Get().FrameStatistics().FrameCount++;
+
+		//std::cout << "FPS: " << Engine::Get().FrameStatistics().FramesPerSecond << std::endl;
+		ProfilerCPU::EndFrame();
 	}
 
 	void Application::FixedUpdate()
@@ -91,6 +116,8 @@ namespace NerfShot
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
 		m_Running = false;
+		m_edit_gui->shut_down();
+		GpuDevice::Get().destroy();
 		return true;
 	}
 

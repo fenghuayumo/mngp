@@ -36,6 +36,8 @@ namespace NerfShot
 		bool m_Minimized = false;
 		float m_LastFrameTime = 0.0f;
 		static Application* s_Instance;
+
+		std::unique_ptr<class EditGui> m_edit_gui;
 	protected:
 	public:
 

@@ -21,7 +21,6 @@ endif()
 
 option(NGP_BUILD_EXECUTABLE "Build nerfshot.exe?" ON)
 option(NGP_BUILD_WITH_GUI "Build with GUI support (requires GLFW and GLEW)?" ON)
-option(NGP_BUILD_WITH_OPTIX "Build with OptiX to enable hardware ray tracing?" ON)
 option(NGP_BUILD_WITH_PYTHON_BINDINGS "Build bindings that allow instrumenting nerfshot with Python?" ON)
 option(NGP_BUILD_WITH_VULKAN "Build with Vulkan to enable DLSS support?" ON)
 
@@ -180,11 +179,11 @@ if (NGP_BUILD_WITH_GUI)
 	if (MSVC)
 		list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/gl3w")
 		list(APPEND GUI_SOURCES "dependencies/gl3w/GL/gl3w.c")
-		list(APPEND NGP_LIBRARIES opengl32 $<TARGET_OBJECTS:glfw_objects>)
+		list(APPEND NGP_LIBRARIES opengl32 $<TARGET_OBJECTS:glfw>)
 	else()
 		find_package(GLEW REQUIRED)
 		list(APPEND NGP_INCLUDE_DIRECTORIES ${GLEW_INCLUDE_DIRS})
-		list(APPEND NGP_LIBRARIES GL ${GLEW_LIBRARIES} $<TARGET_OBJECTS:glfw_objects>)
+		list(APPEND NGP_LIBRARIES GL ${GLEW_LIBRARIES} $<TARGET_OBJECTS:glfw>)
 	endif()
 
 	list(APPEND GUI_SOURCES
@@ -217,12 +216,6 @@ if (OPENMP_FOUND)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-if (NGP_BUILD_WITH_OPTIX)
-	set(NGP_OPTIX ON)
-	list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/optix")
-	list(APPEND NGP_DEFINITIONS -DNGP_OPTIX)
-endif()
-
 if (NGP_BUILD_WITH_PYTHON_BINDINGS)
 	find_package(Python 3.7 COMPONENTS Interpreter Development)
 	if (Python_FOUND)
@@ -250,6 +243,10 @@ endif()
 add_subdirectory("dependencies/zstr")
 list(APPEND NGP_LIBRARIES zstr::zstr)
 
+#Compile Imgui
+
+# add_subdirectory("dependencies/imgui")
+# list(APPEND NGP_LIBRARIES imgui)
 
 ###############################################################################
 # Program
@@ -260,21 +257,27 @@ list(APPEND NGP_INCLUDE_DIRECTORIES "include")
 if (NOT MSVC)
 	list(APPEND NGP_LIBRARIES ${CMAKE_DL_LIBS})
 endif()
-list(APPEND NGP_SOURCES
+# list(APPEND NGP_SOURCES
+# 	${GUI_SOURCES}
+# 	src/camera_path.cu
+# 	src/common.cu
+# 	src/common_device.cu
+# 	src/marching_cubes.cu
+# 	src/nerf_loader.cu
+# 	src/render_buffer.cu
+# 	src/nerfshot_app.cu
+# 	src/ngp_nerf.cu
+# 	src/thread_pool.cpp
+# 	src/tinyexr_wrapper.cu
+# 	src/tinyobj_loader_wrapper.cpp
+# 	src/triangle_bvh.cu
+# )
+
+file(GLOB_RECURSE NGP_SOURCES "src/*.cpp"
+	"scr/*.cu"
 	${GUI_SOURCES}
-	src/camera_path.cu
-	src/common.cu
-	src/common_device.cu
-	src/marching_cubes.cu
-	src/nerf_loader.cu
-	src/render_buffer.cu
-	src/nerfshot_app.cu
-	src/ngp_nerf.cu
-	src/thread_pool.cpp
-	src/tinyexr_wrapper.cu
-	src/tinyobj_loader_wrapper.cpp
-	src/triangle_bvh.cu
 )
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
@@ -283,49 +286,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR})
 
 get_filename_component(CUDA_COMPILER_BIN "${CMAKE_CUDA_COMPILER}" DIRECTORY)
-
-if (NGP_OPTIX)
-	add_library(optix_program OBJECT
-		src/optix/pathescape.cu
-		src/optix/raystab.cu
-		src/optix/raytrace.cu
-	)
-
-	set_target_properties(optix_program PROPERTIES CUDA_PTX_COMPILATION ON CUDA_ARCHITECTURES OFF)
-	target_compile_definitions(optix_program PUBLIC ${NGP_DEFINITIONS} -DTCNN_MIN_GPU_ARCH=0)
-	target_compile_options(optix_program PUBLIC "--expt-relaxed-constexpr")
-
-	get_target_property(TCNN_INCLUDE_DIRECTORIES tiny-cuda-nn INCLUDE_DIRECTORIES)
-	target_include_directories(optix_program PUBLIC ${NGP_INCLUDE_DIRECTORIES} ${TCNN_INCLUDE_DIRECTORIES})
-
-	# OptiX programs will be compiled as PTX and packaged
-	# as headers to be included from the binary dir.
-	list(APPEND NGP_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
-	set(OPTIX_PTX_HEADER ${CMAKE_CURRENT_BINARY_DIR}/optix_ptx.h)
-
-	find_program(bin_to_c NAMES bin2c PATHS ${CUDA_COMPILER_BIN})
-	if (NOT bin_to_c)
-		message(FATAL_ERROR
-			"bin2c not found:\n"
-			"  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
-			"  CUDA_COMPILER_BIN='${CUDA_COMPILER_BIN}'\n"
-		)
-	endif()
-
-	add_custom_command(
-		OUTPUT "${OPTIX_PTX_HEADER}"
-		COMMAND ${CMAKE_COMMAND}
-		"-DBIN_TO_C_COMMAND=${bin_to_c}"
-		"-DOBJECTS=$<TARGET_OBJECTS:optix_program>"
-		"-DOUTPUT=${OPTIX_PTX_HEADER}"
-		-P ${PROJECT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
-		VERBATIM
-		DEPENDS optix_program
-		COMMENT "Converting PTX files to a C header"
-	)
-
-	list(APPEND NGP_SOURCES ${OPTIX_PTX_HEADER})
-endif()
 
 add_library(ngp STATIC ${NGP_SOURCES})
 set_target_properties(ngp PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON CUDA_SEPARABLE_COMPILATION ON)
@@ -356,11 +316,6 @@ endif()
 
 if (NGP_BUILD_EXECUTABLE)
 	add_executable(nerfshot src/main.cu
-		src/core/log.cpp
-		src/platform/input.cpp
-		src/platform/window.cpp
-		src/application.cpp
-		src/platform/glfw_window.cpp
 		src/main.cpp
 	)
 	target_link_libraries(nerfshot PRIVATE ngp)
@@ -381,10 +336,10 @@ if (NGP_BUILD_EXECUTABLE)
 	endif()
 endif(NGP_BUILD_EXECUTABLE)
 
-if (Python_FOUND)
-	add_library(pyngp SHARED src/python_api.cu)
-	set_target_properties(pyngp PROPERTIES CXX_VISIBILITY_PRESET "hidden" CUDA_VISIBILITY_PRESET "hidden")
-	target_link_libraries(pyngp PRIVATE ngp PUBLIC ${PYTHON_LIBRARIES} pybind11::module)
-	target_compile_definitions(pyngp PUBLIC -DNGP_PYTHON)
-	pybind11_extension(pyngp)
-endif()
+# if (Python_FOUND)
+# 	add_library(pyngp SHARED src/python_api.cu)
+# 	set_target_properties(pyngp PROPERTIES CXX_VISIBILITY_PRESET "hidden" CUDA_VISIBILITY_PRESET "hidden")
+# 	target_link_libraries(pyngp PRIVATE ngp PUBLIC ${PYTHON_LIBRARIES} pybind11::module)
+# 	target_compile_definitions(pyngp PUBLIC -DNGP_PYTHON)
+# 	pybind11_extension(pyngp)
+# endif()

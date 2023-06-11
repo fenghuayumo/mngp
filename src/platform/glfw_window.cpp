@@ -114,10 +114,10 @@ namespace NerfShot
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 #endif
 
-		m_Handle = glfwCreateWindow(ScreenWidth, ScreenHeight, properties.Title.c_str(), nullptr, nullptr, nullptr);
+		m_Handle = glfwCreateWindow(ScreenWidth, ScreenHeight, properties.Title.c_str(), nullptr, nullptr);
 
 
-		//glfwMakeContextCurrent(m_Handle);
+		glfwMakeContextCurrent(m_Handle);
 
 		glfwSetWindowUserPointer(m_Handle, &m_Data);
 
