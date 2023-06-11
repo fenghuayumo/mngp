@@ -18,6 +18,7 @@ namespace NerfShot
 		Input::Create();
 
 		WindowProperties props;
+		props.Title = name;
 		// DEFAULT USE VULKAN API
 		m_Window = Window::Create(props);
 		m_Window->Initialize();

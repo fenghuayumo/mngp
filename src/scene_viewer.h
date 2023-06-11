@@ -14,6 +14,11 @@ namespace NerfShot
 		}
 
 		void OnImGuiRender();
+	public:
+		void DrawMenuBar();
+		void BeginDockSpace(bool infoBar);
+		void EndDockSpace();
+
 	private:
 		std::vector<std::shared_ptr<NerfShot::EditorWindow>> m_Windows;
 

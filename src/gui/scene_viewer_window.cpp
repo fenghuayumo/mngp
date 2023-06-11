@@ -1,14 +1,14 @@
-#include "video_window.h"
+#include "scene_viewer_window.h"
 #include <imgui.h>
 namespace NerfShot
 {
-    VideoWindow::VideoWindow()
+    SceneViewerWindow::SceneViewerWindow()
 	{
 	}
-	void VideoWindow::OnImGui()
+	void SceneViewerWindow::OnImGui()
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-		ImGui::Begin("Video");
+		ImGui::Begin("Viewport");
 
 
 		ImGui::End();

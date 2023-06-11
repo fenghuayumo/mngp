@@ -77,12 +77,8 @@ namespace NerfShot
 		SetDarkThemeColors();
 		// Upload Fonts
 		//{
-		//	// Use any command queue
-		//	auto command_buffer = RenderToolsVulkan::BeginSingleTimeCommands();
-		//	ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-		//	RenderToolsVulkan::EndSingleTimeCommands(command_buffer);
-		//	ImGui_ImplVulkan_DestroyFontUploadObjects();
-		//}
+		ImGui_ImplOpenGL3_CreateFontsTexture();
+		// ImGui_ImplOpenGL3_DestroyFontUploadObjects();
 
 	}
 
@@ -112,6 +108,8 @@ namespace NerfShot
 
 	void EditGui::shut_down()
 	{
+		ImGui_ImplOpenGL3_DestroyFontsTexture();
+
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
